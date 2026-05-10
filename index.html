@@ -1,48 +1,199 @@
-async function connectBluetooth() {
-  try {
-    printerLog("Mencari perangkat Bluetooth...");
-    
-    // Gunakan acceptAllDevices jika filter UUID sering gagal
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        '000018f0-0000-1000-8000-00805f9b34fb', 
-        '0000ff00-0000-1000-8000-00805f9b34fb', // Sering digunakan printer murah
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455'  // UUID alternatif
-      ]
-    });
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mini POS Kopi Rimba</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-    printerLog(`Menghubungkan ke ${device.name}...`);
-    const server = await device.gatt.connect();
-    
-    // Mencoba mencari service yang tersedia dari daftar optionalServices
-    let service = null;
-    const services = await server.getPrimaryServices();
-    
-    if (services.length > 0) {
-      service = services[0]; // Ambil service pertama yang ditemukan
-    } else {
-      throw new Error("Service printer tidak ditemukan.");
-    }
+<div class="header">
+    <div class="brand-sub">KOPI RIMBA MAZBOY GROUP</div>
+    <h1 class="brand-main">Sistem Laporan Harian</h1>
+</div>
 
-    const characteristics = await service.getCharacteristics();
-    // Mencari karakteristik yang mendukung penulisan data (Write)
-    btCharacteristic = characteristics.find(c => 
-      c.properties.write || c.properties.writeWithoutResponse
-    );
+<div class="container">
+    <div id="tab-absen" class="tab-content active">
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="avatar">☕</div>
+                <div>
+                    <p class="welcome-text">Selamat Bekerja,</p>
+                    <h2 id="display-name">Nama Staff</h2>
+                    <p id="display-role">Shift belum dipilih</p>
+                </div>
+            </div>
+            <div class="profile-meta">
+                <span>🕒 <strong id="live-clock">--:--:--</strong></span>
+                <span>📍 <strong>Kopi Rimba Mazboy</strong></span>
+            </div>
+        </div>
+        <div class="card card-input-area">
+            <div class="input-group">
+                <label>Nama Lengkap</label>
+                <input id="p_nama" type="text" placeholder="Input nama..." oninput="updateProfile()">
+            </div>
+            <div class="input-group">
+                <label>Shift / Outlet</label>
+                <select id="p_outlet" onchange="updateProfile()">
+                    <option value="">-- Pilih Shift --</option>
+                    <option>Kasir - Pagi</option>
+                    <option>Kasir - Malam</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Modal Awal (Cash)</label>
+                <input id="p_rupiah" type="text" placeholder="Rp 0" onkeyup="fmtRp(this); if(typeof calcTotal === 'function') calcTotal();">
+            </div>
+            <button class="btn-primary" onclick="doCheckin()">KONFIRMASI MULAI KERJA</button>
+        </div>
+    </div>
 
-    if (btCharacteristic) {
-      printerConnected = true;
-      updatePrinterStatus('connected', `BT: ${device.name}`, 'Terhubung via Bluetooth');
-      printerLog("✓ Printer Bluetooth siap!");
-      toast("✓ Bluetooth Terhubung!");
-    } else {
-      throw new Error("Karakteristik Write tidak ditemukan.");
-    }
-  } catch (error) {
-    console.error(error);
-    printerLog("✗ Error BT: " + error.message);
-    updatePrinterStatus('error', 'Gagal Bluetooth', error.message);
-    toast("Gagal: " + error.message);
-  }
-}
+    <div id="tab-penjualan" class="tab-content">
+        <div class="card">
+            <div class="card-title">📋 Pilih Menu</div>
+            <div class="menu-grid" id="menu-grid"></div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">💸 Pengeluaran (Opsional)</div>
+            <div class="expense-input-row">
+                <input id="exp-name" type="text" placeholder="Barang (Contoh: Gas)">
+                <input id="exp-price" type="text" placeholder="Rp 0" onkeyup="fmtRp(this)">
+                <button class="btn-add-exp" onclick="addExpense()">+</button>
+            </div>
+            <div id="expense-list"></div>
+            <div class="input-group" style="margin-top:10px">
+                <label>Total Pengeluaran</label>
+                <input id="p_keluar" readonly class="total-bold-gray" value="Rp 0">
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">💰 Perhitungan Keuangan</div>
+            <div class="input-group">
+                <label>Modal Awal (Dari Check-in)</label>
+                <input id="p_modal_readonly" readonly class="total-bold-gray" value="Rp 0">
+            </div>
+            
+            <div class="total-summary-grid" style="grid-template-columns: 1fr 1fr;">
+                <div>
+                    <label>Total Omzet</label>
+                    <div class="val" id="total-omzet-val">Rp 0</div>
+                </div>
+                <div>
+                    <label>Omzet Tunai</label>
+                    <div class="val" id="total-tunai-omzet-val" style="color: #2e7d32;">Rp 0</div>
+                </div>
+                <div>
+                    <label>Omzet QRIS</label>
+                    <div class="val" id="total-qris-val" style="color: #1976d2;">Rp 0</div>
+                </div>
+                <div>
+                    <label>Omzet Online</label>
+                    <div class="val" id="total-online-val" style="color: #f57c00;">Rp 0</div>
+                </div>
+            </div>
+            
+                        <div class="input-group" style="margin-top: 15px;">
+                <label style="font-size: 13px; color: #d32f2f;">Setoran Tunai Bersih (Modal + Tunai - Keluar)</label>
+                <input id="total-setoran-val" readonly class="total-bold-gray" value="Rp 0" style="border-color:#d32f2f; color:#d32f2f; font-size:18px;">
+            </div>
+            <button class="btn-dark" onclick="checkout()">⚡ KIRIM LAPORAN KE WHATSAPP</button>
+            
+            <!-- TOMBOL RESET DARURAT (Tambahkan kode ini) -->
+            <button onclick="confirmResetDarurat()" style="margin-top: 12px; width: 100%; padding: 12px; background: #fff; color: #d32f2f; border: 2px dashed #d32f2f; border-radius: 12px; font-weight: 800; font-size: 14px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: 0.2s;">
+                🚨 RESET DATA DARURAT
+            </button>
+            <!-- END TOMBOL RESET DARURAT -->
+
+        </div>
+    </div>
+
+
+    <div id="tab-stok" class="tab-content">
+        <div class="card">
+            <div class="card-title">📦 Stok Opname (Sisa Akhir)</div>
+            <div class="input-group">
+                <label>Sisa Cup</label>
+                <input id="stok_cup" type="number" placeholder="Total Cup Keseluruhan">
+            </div>
+            <div class="input-group">
+                <label>Sisa Bubuk/Bahan (stok)</label>
+                <input id="stok_bahan" type="text" placeholder="SKM,UHT,Milo">
+            </div>
+            <div class="input-group">
+                <label>Catatan Lainnya</label>
+                <textarea id="stok_note" rows="3" placeholder="Contoh: Sabun cuci piring habis..."></textarea>
+            </div>
+            <p style="font-size: 11px; color: #888;">*Data ini akan otomatis ikut terkirim dalam laporan.</p>
+        </div>
+    </div>
+
+    <div id="tab-riwayat" class="tab-content">
+        <div class="card">
+            <div class="card-title">🧾 Riwayat Transaksi</div>
+            <div id="riwayat-list"></div>
+        </div>
+        <button class="btn-dark" onclick="exportRiwayat()">📋 SALIN REKAP KE CLIPBOARD</button>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <button class="nav-item active" onclick="openTab('tab-absen',this)">
+        <span class="nav-icon">📍</span><span class="nav-text">Check-in</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-penjualan',this)">
+        <span class="nav-icon">☕</span><span class="nav-text">Kasir</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-stok',this)">
+        <span class="nav-icon">📦</span><span class="nav-text">Stok</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-riwayat',this)">
+        <span class="nav-icon">📊</span><span class="nav-text">Riwayat</span>
+    </button>
+</div>
+
+<button id="float-cart-btn" onclick="openCartModal()">
+    <span id="float-cart-badge">0</span>
+    <span id="float-cart-total">Rp 0</span>
+</button>
+
+<div id="cart-modal-overlay" onclick="closeCartModal(event)">
+    <div id="cart-modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+            <div style="flex: 1; margin-right: 15px;">
+                <div class="modal-title">Keranjang Pesanan</div>
+                <input type="text" id="cart-customer-name" placeholder="Nama Customer (Opsional)" autocomplete="off">
+            </div>
+            <button class="btn-close-modal" onclick="closeCartModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-cart-items"></div>
+        
+        <div class="input-group" style="margin-top:15px; margin-bottom:5px;">
+            <label>Metode Pembayaran</label>
+            <select id="cart-payment">
+                <option value="Tunai">💵 Tunai</option>
+                <option value="QRIS">📱 QRIS / Transfer</option>
+                <option value="Online">🛵 Online (Gojek/Grab/dll)</option>
+            </select>
+        </div>
+
+        <div class="modal-footer">
+            <div class="modal-total-row">
+                <span>Subtotal</span>
+                <span id="modal-subtotal">Rp 0</span>
+            </div>
+            <div class="modal-footer-btns">
+                <button class="btn-reset" onclick="resetCartOnly()">Reset</button>
+                <button class="btn-confirm" onclick="confirmOrder()">Selesai</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
