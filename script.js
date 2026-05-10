@@ -12,7 +12,7 @@ const MENUS = [
     {label:"Hazelnut Latte",harga:12000},{label:"Fresh Milk",harga:8000},
     {label:"Chocolate",harga:8000},{label:"Strawberry",harga:8000},
     {label:"Manggo",harga:8000},{label:"Thaitea",harga:8000},
-    {label:"Taro",harga:8000},{label:"Matcha",harga:9000},{label:"Milo",harga:9000},{label:"Gratis",harga:0}
+    {label:"Taro",harga:8000},{label:"Matcha",harga:9000},{label:"Milo",harga:9000},{label:"Gratis",harga:0},{label:"Staff",harga:0}
 ];
 
 let cart = {};
