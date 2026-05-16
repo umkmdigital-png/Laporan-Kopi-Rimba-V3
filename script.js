@@ -536,3 +536,239 @@ function confirmResetDarurat() {
         showToast("🚨 Semua data berhasil dikosongkan!");
     }
 }
+
+// 1. Tambahkan fungsi baru ini di area "HELPERS" atau "RENDER MENUS"
+function addManualMenu() {
+    const nameInput = document.getElementById('manual_name');
+    const priceInput = document.getElementById('manual_price');
+
+    const n = nameInput.value.trim();
+    const h = parseInt(priceInput.value.replace(/[^0-9]/g, '')) || 0;
+
+    if (!n || h <= 0) {
+        return alert('Masukkan nama item dan harga yang valid!');
+    }
+
+    // Buat ID unik untuk menu custom agar tidak bertabrakan
+    const id = 'manual_' + Date.now();
+
+    // Masukkan ke state Menu Utama (cP)
+    if (!cP[id]) {
+        cP[id] = { qty: 0, h: h, n: n, isManual: true };
+    }
+    cP[id].qty++;
+
+    // Bersihkan form setelah input
+    nameInput.value = '';
+    priceInput.value = '';
+
+    if(navigator.vibrate) navigator.vibrate(15);
+    toast('✓ Item manual ditambahkan');
+    
+    // Perbarui keranjang dan kalkulasi
+    upd(); 
+}
+
+// 2. Cari fungsi calcTot() di script asli Anda, lalu GANTI seluruh isinya dengan ini:
+function calcTot() {
+    const omzetTunai = orders.filter(o=>o.pay==='Tunai').reduce((a,o)=>a+o.sub, 0);
+    const omzetQRIS = orders.filter(o=>o.pay==='QRIS').reduce((a,o)=>a+o.sub, 0);
+    const omzetOnline = orders.filter(o=>o.pay==='Gojek/Online').reduce((a,o)=>a+o.sub, 0);
+
+    const { sP, sT, sSc } = tots();
+    const keranjang = sP + sT + sSc;
+
+    const modal = nn(g('p_modal').value);
+    const pengeluaran = exps.reduce((a,b) => a+b.p, 0);
+
+    /* BARIS DI BAWAH INI TELAH DIHAPUS AGAR QRIS TIDAK TERISI OTOMATIS:
+       g('p_qris').value = rp(totalQRIS);
+    */
+    
+    // Ambil nilai QRIS langsung dari apa yang diketik staf (Manual)
+    const manualQris = nn(g('p_qris').value);
+    // (Opsional) Jika Online juga mau manual, biarkan kode ini mengambil dari input
+    const manualOnline = nn(g('p_online').value);
+
+    // Hitung ulang Netto Tunai Kasir
+    // Netto = Modal + Total Semua Omzet Fisik - Pengeluaran Kasir - Uang di QRIS - Uang di Online
+    const totalSemuaPenjualan = omzetTunai + omzetQRIS + omzetOnline + keranjang;
+    const nettoTunai = modal + totalSemuaPenjualan - pengeluaran - manualQris - manualOnline;
+
+    const totalPorsi = orders.reduce((a,o)=>a+o.porsi, 0) + Object.values(cP).reduce((a,b)=>a+b.qty, 0);
+
+    g('t_porsi').innerText = totalPorsi + ' Porsi';
+    g('t_tunai').innerText = rp(nettoTunai < 0 ? 0 : nettoTunai);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const calc = document.getElementById("floating-calc");
+    const header = document.getElementById("calc-header");
+    const triggerBtn = document.getElementById("calc-trigger-btn");
+    const closeBtn = document.getElementById("calc-close-btn");
+    const minBtn = document.getElementById("calc-min-btn");
+    
+    const output = document.getElementById("calc-output");
+    const history = document.getElementById("calc-history");
+    const buttons = document.querySelectorAll(".btn");
+
+    let currentInput = "0";
+    let previousInput = "";
+    let operator = null;
+    let shouldResetScreen = false;
+
+    // --- 1. Fitur Buka / Tutup / Minimize ---
+    triggerBtn.addEventListener("click", () => {
+        calc.classList.remove("hidden");
+    });
+
+    closeBtn.addEventListener("click", () => {
+        calc.classList.add("hidden");
+    });
+
+    minBtn.addEventListener("click", () => {
+        calc.classList.toggle("minimized");
+        minBtn.textContent = calc.classList.contains("minimized") ? "🗖" : "−";
+    });
+
+    // --- 2. Logika Utama Kalkulator ---
+    buttons.forEach(button => {
+        button.addEventListener("click", () => {
+            const num = button.dataset.num;
+            const action = button.dataset.action;
+
+            if (num !== undefined) appendNumber(num);
+            if (action !== undefined) handleAction(action);
+        });
+    });
+
+    function appendNumber(num) {
+        if (currentInput === "0" && num !== "." || shouldResetScreen) {
+            currentInput = num;
+            shouldResetScreen = false;
+        } else {
+            if (num === "." && currentInput.includes(".")) return;
+            currentInput += num;
+        }
+        updateScreen();
+    }
+
+    function handleAction(action) {
+        switch (action) {
+            case "clear":
+                currentInput = "0";
+                previousInput = "";
+                operator = null;
+                history.textContent = "";
+                break;
+            case "backspace":
+                if (currentInput.length > 1) {
+                    currentInput = currentInput.slice(0, -1);
+                } else {
+                    currentInput = "0";
+                }
+                break;
+            case "percent":
+                currentInput = (parseFloat(currentInput) / 100).toString();
+                break;
+            case "add":
+            case "subtract":
+            case "multiply":
+            case "divide":
+                setOperator(action);
+                break;
+            case "calculate":
+                evaluate();
+                break;
+        }
+        updateScreen();
+    }
+
+    function setOperator(op) {
+        if (operator !== null) evaluate();
+        previousInput = currentInput;
+        operator = op;
+        const opSymbols = { add: "+", subtract: "−", multiply: "×", divide: "÷" };
+        history.textContent = `${previousInput} ${opSymbols[op]}`;
+        shouldResetScreen = true;
+    }
+
+    function evaluate() {
+        if (operator === null || shouldResetScreen) return;
+        
+        let result = 0;
+        const prev = parseFloat(previousInput);
+        const current = parseFloat(currentInput);
+
+        switch (operator) {
+            case "add": result = prev + current; break;
+            case "subtract": result = prev - current; break;
+            case "multiply": result = prev * current; break;
+            case "divide": 
+                result = current === 0 ? "Error" : prev / current; 
+                break;
+        }
+
+        // Membatasi angka di belakang koma agar tidak terlalu panjang
+        if (typeof result === "number") {
+            result = Math.round(result * 10000000) / 10000000;
+        }
+
+        history.textContent += ` ${currentInput} =`;
+        currentInput = result.toString();
+        operator = null;
+    }
+
+    function updateScreen() {
+        output.textContent = currentInput;
+    }
+
+    // --- 3. Fitur Drag & Drop (Geser) Lancar PC & HP ---
+    let isDragging = false;
+    let startX, startY, initialX, initialY;
+
+    header.addEventListener("mousedown", dragStart);
+    header.addEventListener("touchstart", dragStart, { passive: false });
+
+    function dragStart(e) {
+        if (e.target.tagName === "BUTTON") return; // Cegah drag jika menekan tombol kontrol
+
+        isDragging = true;
+        const clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+
+        startX = clientX;
+        startY = clientY;
+        
+        const rect = calc.getBoundingClientRect();
+        initialX = rect.left;
+        initialY = rect.top;
+
+        document.addEventListener("mousemove", dragMove);
+        document.addEventListener("touchmove", dragMove, { passive: false });
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchend", dragEnd);
+    }
+
+    function dragMove(e) {
+        if (!isDragging) return;
+        if (e.type === "touchmove") e.preventDefault(); // Mencegah scroll layar HP saat geser
+
+        const clientX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+
+        // Terapkan posisi baru berdasarkan kalkulasi pergeseran posisi awal
+        calc.style.left = `${initialX + dx}px`;
+        calc.style.top = `${initialY + dy}px`;
+        calc.style.right = "auto"; // Override gaya CSS kanan default
+    }
+
+    function dragEnd() {
+        isDragging = false;
+        document.removeEventListener("mousemove", dragMove);
+        document.removeEventListener("touchmove", dragMove);
+    }
+});
