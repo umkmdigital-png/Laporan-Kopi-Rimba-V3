@@ -119,4 +119,147 @@
         </div>
 
         <div class="card">
-            <h4 style="font-size: 14px; margin-bottom: 10px; color: #4a5568;">💳
+            <h4 style="font-size: 14px; margin-bottom: 10px; color: #4a5568;">💳 Uang Non-Tunai (Manual)</h4>
+            <div class="input-group">
+                <label>Setoran QRIS (Memotong Netto Tunai):</label>
+                <input type="text" id="p_qris" placeholder="Rp 0" onkeyup="fmtRp(this); calcTotal();" onchange="saveState()" />
+            </div>
+            <div class="input-group">
+                <label>Setoran Online (Gojek/Grab):</label>
+                <input type="text" id="p_online" placeholder="Rp 0" onkeyup="fmtRp(this); calcTotal();" onchange="saveState()" />
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-stok" class="tab-content">
+        <div class="card">
+            <div class="card-title">📦 Stok Opname (Sisa Akhir)</div>
+            <div class="input-group">
+                <label>Sisa Cup</label>
+                <input id="stok_cup" type="number" placeholder="Total Cup Keseluruhan">
+            </div>
+            <div class="input-group">
+                <label>Sisa Bubuk/Bahan (stok)</label>
+                <input id="stok_bahan" type="text" placeholder="SKM,UHT,Milo">
+            </div>
+            <div class="input-group">
+                <label>Catatan Lainnya</label>
+                <textarea id="stok_note" rows="3" placeholder="Contoh: Sabun cuci piring habis..."></textarea>
+            </div>
+            <p style="font-size: 11px; color: #888;">*Data ini akan otomatis ikut terkirim dalam laporan.</p>
+        </div>
+    </div>
+
+    <div id="tab-riwayat" class="tab-content">
+        <div class="card">
+            <div class="card-title">🧾 Riwayat Transaksi</div>
+            <div id="riwayat-list"></div>
+        </div>
+        <button class="btn-dark" onclick="exportRiwayat()">📋 SALIN REKAP KE CLIPBOARD</button>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <button class="nav-item active" onclick="openTab('tab-absen',this)">
+        <span class="nav-icon">📍</span><span class="nav-text">Check-in</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-penjualan',this)">
+        <span class="nav-icon">☕</span><span class="nav-text">Kasir</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-stok',this)">
+        <span class="nav-icon">📦</span><span class="nav-text">Stok</span>
+    </button>
+    <button class="nav-item" onclick="openTab('tab-riwayat',this)">
+        <span class="nav-icon">📊</span><span class="nav-text">Riwayat</span>
+    </button>
+</div>
+
+<button id="float-cart-btn" onclick="openCartModal()">
+    <span id="float-cart-badge">0</span>
+    <span id="float-cart-total">Rp 0</span>
+</button>
+
+<div id="cart-modal-overlay" onclick="closeCartModal(event)">
+    <div id="cart-modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+            <div style="flex: 1; margin-right: 15px;">
+                <div class="modal-title">Keranjang Pesanan</div>
+                <input type="text" id="cart-customer-name" placeholder="Nama Customer (Opsional)" autocomplete="off">
+            </div>
+            <button class="btn-close-modal" onclick="closeCartModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-cart-items"></div>
+        
+        <div class="input-group" style="margin-top:15px; margin-bottom:5px;">
+            <label>Metode Pembayaran</label>
+            <select id="cart-payment">
+                <option value="Tunai">💵 Tunai</option>
+                <option value="QRIS">📱 QRIS / Transfer</option>
+                <option value="Online">🛵 Online (Gojek/Grab/dll)</option>
+            </select>
+        </div>
+
+        <div class="modal-footer">
+            <div class="modal-total-row">
+                <span>Subtotal</span>
+                <span id="modal-subtotal">Rp 0</span>
+            </div>
+            <div class="modal-footer-btns">
+                <button class="btn-reset" onclick="resetCartOnly()">Reset</button>
+                <button class="btn-confirm" onclick="confirmOrder()">Selesai</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button id="calc-trigger-btn" class="calc-trigger-btn">
+    📊 Kalkulator
+</button>
+
+<div id="floating-calc" class="floating-calculator hidden">
+    <div id="calc-header" class="calc-header">
+        <span class="calc-title">🧮 Kalkulator</span>
+        <div class="calc-controls">
+            <button id="calc-min-btn" title="Minimize">−</button>
+            <button id="calc-close-btn" title="Close">×</button>
+        </div>
+    </div>
+    
+    <div class="calc-body">
+        <div class="calc-screen">
+            <div id="calc-history" class="calc-history"></div>
+            <div id="calc-output" class="calc-output">0</div>
+        </div>
+        
+        <div class="calc-buttons">
+            <button class="btn btn-action" data-action="clear">C</button>
+            <button class="btn btn-action" data-action="backspace">⌫</button>
+            <button class="btn btn-action" data-action="percent">%</button>
+            <button class="btn btn-operator" data-action="divide">÷</button>
+            
+            <button class="btn" data-num="7">7</button>
+            <button class="btn" data-num="8">8</button>
+            <button class="btn" data-num="9">9</button>
+            <button class="btn btn-operator" data-action="multiply">×</button>
+            
+            <button class="btn" data-num="4">4</button>
+            <button class="btn" data-num="5">5</button>
+            <button class="btn" data-num="6">6</button>
+            <button class="btn btn-operator" data-action="subtract">−</button>
+            
+            <button class="btn" data-num="1">1</button>
+            <button class="btn" data-num="2">2</button>
+            <button class="btn" data-num="3">3</button>
+            <button class="btn btn-operator" data-action="add">+</button>
+            
+            <button class="btn btn-zero" data-num="0">0</button>
+            <button class="btn" data-num=".">.</button>
+            <button class="btn btn-equals" data-action="calculate">=</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
