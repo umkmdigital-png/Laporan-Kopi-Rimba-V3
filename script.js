@@ -12,7 +12,7 @@ const MENUS = [
     {label:"Hazelnut Latte",harga:12000},{label:"Fresh Milk",harga:8000},
     {label:"Chocolate",harga:8000},{label:"Strawberry",harga:8000},
     {label:"Manggo",harga:8000},{label:"Thaitea",harga:8000},
-    {label:"Taro",harga:8000},{label:"Matcha",harga:9000},{label:"Milo",harga:9000},{label:"Gratis",harga:0},{label:"Staff",harga:0}
+    {label:"Taro",harga:8000},{label:"Matcha",harga:9000},{label:"Milo",harga:9000},{label:"Gratis",harga:0}
 ];
 
 let cart = {};
@@ -42,7 +42,7 @@ function showToast(msg) {
     if (!t) {
         t = document.createElement('div'); t.id = 'toast';
         Object.assign(t.style, {position:'fixed', bottom:'110px', left:'50%', transform:'translateX(-50%)', background:'#1a1a1a', color:'#fff', padding:'10px 20px', borderRadius:'20px', fontSize:'13px', fontWeight:'700', zIndex:'9999', transition:'opacity .4s'});
-        document.body.appendChild(t); 
+        document.body.appendChild(t);
     }
     t.innerText = msg; t.style.opacity = '1';
     setTimeout(() => t.style.opacity = '0', 2200);
@@ -74,6 +74,7 @@ function doCheckin() {
     if (kasirBtn) openTab('tab-penjualan', kasirBtn);
 }
 
+// FUNGSI UNTUK MENYIMPAN DATA SEMENTARA (ANTI-RESET)
 function saveState() {
     localStorage.setItem('rimba_cart', JSON.stringify(cart));
     localStorage.setItem('rimba_orders', JSON.stringify(sessionOrders));
@@ -84,10 +85,9 @@ function saveState() {
     localStorage.setItem('rimba_cup', document.getElementById('stok_cup')?.value || '');
     localStorage.setItem('rimba_bahan', document.getElementById('stok_bahan')?.value || '');
     localStorage.setItem('rimba_note', document.getElementById('stok_note')?.value || '');
-    localStorage.setItem('rimba_qris', document.getElementById('p_qris')?.value || '');
-    localStorage.setItem('rimba_online', document.getElementById('p_online')?.value || '');
 }
 
+// FUNGSI UNTUK MEMUAT DATA SEMENTARA SAAT APLIKASI DIBUKA
 function loadState() {
     try {
         const sc = localStorage.getItem('rimba_cart'); if(sc) cart = JSON.parse(sc);
@@ -100,8 +100,6 @@ function loadState() {
     const scup = localStorage.getItem('rimba_cup'); if(scup && document.getElementById('stok_cup')) document.getElementById('stok_cup').value = scup;
     const sb = localStorage.getItem('rimba_bahan'); if(sb && document.getElementById('stok_bahan')) document.getElementById('stok_bahan').value = sb;
     const sn = localStorage.getItem('rimba_note'); if(sn && document.getElementById('stok_note')) document.getElementById('stok_note').value = sn;
-    const sqris = localStorage.getItem('rimba_qris'); if(sqris && document.getElementById('p_qris')) document.getElementById('p_qris').value = sqris;
-    const sonline = localStorage.getItem('rimba_online'); if(sonline && document.getElementById('p_online')) document.getElementById('p_online').value = sonline;
 }
 
 // ==========================================
@@ -123,17 +121,11 @@ function calcTotal() {
         else if (o.payment === 'Online') omzetOnline += o.subtotal;
     });
 
-    const totalJualSesi = omzetTunai + omzetQRIS + omzetOnline + currentBruto;
+    const totalJualSesi = omzetTunai + omzetQRIS + omzetOnline;
     const totalKeluar = expenses.reduce((a, b) => a + b.price, 0);
     const modalAwal = cleanNum(document.getElementById('p_rupiah')?.value);
 
-    // Ambil nilai QRIS & Online manual yang diinput staff
-    const manualQris = cleanNum(document.getElementById('p_qris')?.value);
-    const manualOnline = cleanNum(document.getElementById('p_online')?.value);
-
-    // Hitung ulang Netto Setoran Tunai Kasir
-    const setoranTunai = modalAwal + totalJualSesi - totalKeluar - manualQris - manualOnline;
-    const totalPorsi = totalCupSesi + currentCups;
+    const setoranTunai = modalAwal + omzetTunai - totalKeluar;
 
     const updateUI = (id, text, isInput = false) => {
         const el = document.getElementById(id);
@@ -141,9 +133,6 @@ function calcTotal() {
         if (isInput || el.tagName === 'INPUT') el.value = text;
         else el.innerText = text;
     };
-
-    const porsiEl = document.getElementById('t_porsi');
-    if (porsiEl) porsiEl.innerText = totalPorsi + ' Porsi';
 
     updateUI('p_modal_readonly', "Rp " + modalAwal.toLocaleString('id-ID'), true);
     updateUI('p_keluar', "Rp " + totalKeluar.toLocaleString('id-ID'), true);
@@ -153,25 +142,14 @@ function calcTotal() {
     updateUI('total-qris-val', "Rp " + omzetQRIS.toLocaleString('id-ID'));
     updateUI('total-online-val', "Rp " + omzetOnline.toLocaleString('id-ID'));
     
-    updateUI('total-setoran-val', "Rp " + (setoranTunai < 0 ? 0 : setoranTunai).toLocaleString('id-ID'), true);
-    
-    const tunaiTextEl = document.getElementById('t_tunai');
-    if (tunaiTextEl) tunaiTextEl.innerText = "Rp " + (setoranTunai < 0 ? 0 : setoranTunai).toLocaleString('id-ID');
+    updateUI('total-setoran-val', "Rp " + setoranTunai.toLocaleString('id-ID'), true);
 }
 
 function renderMenu() {
     const g = document.getElementById('menu-grid');
     if (!g) return;
     g.innerHTML = '';
-    
-    const allMenus = [...MENUS];
-    for (const k in cart) {
-        if (cart[k].isManual) {
-            allMenus.push({ label: k, harga: cart[k].harga });
-        }
-    }
-
-    allMenus.forEach(m => {
+    MENUS.forEach(m => {
         const qty = cart[m.label] ? cart[m.label].qty : 0;
         const d = document.createElement('div');
         d.className = 'menu-item' + (qty > 0 ? ' has-qty' : '');
@@ -188,32 +166,6 @@ function renderMenu() {
             </div>`;
         g.appendChild(d);
     });
-}
-
-function addManualMenu() {
-    const nameInput = document.getElementById('manual_name');
-    const priceInput = document.getElementById('manual_price');
-
-    if (!nameInput || !priceInput) return;
-
-    const n = nameInput.value.trim();
-    const h = parseInt(priceInput.value.replace(/[^0-9]/g, '')) || 0;
-
-    if (!n || h <= 0) {
-        return alert('Masukkan nama item dan harga yang valid!');
-    }
-
-    if (!cart[n]) {
-        cart[n] = { qty: 0, harga: h, isManual: true };
-    }
-    cart[n].qty++;
-
-    nameInput.value = '';
-    priceInput.value = '';
-
-    hapticFeedback();
-    showToast('✓ Item manual ditambahkan');
-    updateAll(); 
 }
 
 function addItem(label, harga) {
@@ -338,14 +290,14 @@ function addExpense() {
     document.getElementById('exp-price').value = "";
     renderExpenses();
     calcTotal();
-    saveState(); 
+    saveState(); // Simpan otomatis
 }
 
 function removeExpense(index) {
     expenses.splice(index, 1);
     renderExpenses();
     calcTotal();
-    saveState(); 
+    saveState(); // Simpan otomatis
 }
 
 function renderExpenses() {
@@ -442,9 +394,6 @@ async function checkout() {
     const catatanStok = document.getElementById('stok_note')?.value || "-";
 
     const modalAwal = cleanNum(document.getElementById('p_rupiah')?.value);
-    const manualQris = cleanNum(document.getElementById('p_qris')?.value);
-    const manualOnline = cleanNum(document.getElementById('p_online')?.value);
-
     const totalCup = sessionOrders.reduce((a, o) => a + o.totalCup, 0);
     const totalKeluar = expenses.reduce((a, b) => a + b.price, 0);
     
@@ -456,7 +405,7 @@ async function checkout() {
     });
     
     const totalJual = omzetTunai + omzetQRIS + omzetOnline;
-    const setoranTunai = modalAwal + totalJual - totalKeluar - manualQris - manualOnline;
+    const setoranTunai = modalAwal + omzetTunai - totalKeluar;
 
     let itemRekap = {};
     sessionOrders.forEach(order => {
@@ -490,11 +439,9 @@ async function checkout() {
     
     teks += `*LAPORAN KEUANGAN TUNAI:*\n`;
     teks += `💼 Modal Awal: Rp ${modalAwal.toLocaleString('id-ID')}\n`;
-    teks += `➕ Omzet Sistem: Rp ${totalJual.toLocaleString('id-ID')}\n`;
-    teks += `➖ Pengeluaran Kasir: Rp ${totalKeluar.toLocaleString('id-ID')}\n`;
-    if(manualQris > 0) teks += `➖ Uang di QRIS: Rp ${manualQris.toLocaleString('id-ID')}\n`;
-    if(manualOnline > 0) teks += `➖ Uang di Online: Rp ${manualOnline.toLocaleString('id-ID')}\n`;
-    teks += `✅ *SETORAN BERSIH: Rp ${(setoranTunai < 0 ? 0 : setoranTunai).toLocaleString('id-ID')}*\n━━━━━━━━━━━━\n\n`;
+    teks += `➕ Omzet Tunai: Rp ${omzetTunai.toLocaleString('id-ID')}\n`;
+    teks += `➖ Pengeluaran: Rp ${totalKeluar.toLocaleString('id-ID')}\n`;
+    teks += `✅ *SETORAN BERSIH: Rp ${setoranTunai.toLocaleString('id-ID')}*\n━━━━━━━━━━━━\n\n`;
     
     teks += `*RINGKASAN PENJUALAN:*\n`;
     teks += `🥤 Volume: ${totalCup} Cup\n`;
@@ -519,15 +466,73 @@ async function checkout() {
 function resetSemuaData() {
     sessionOrders = []; expenses = []; cart = {}; orderCounter = 0;
     
-    const fields = ['p_rupiah', 'stok_cup', 'stok_bahan', 'stok_note', 'exp-name', 'exp-price', 'cart-customer-name', 'p_qris', 'p_online'];
+    // Kosongkan input form (kecuali Nama dan Outlet)
+    const fields = ['p_rupiah', 'stok_cup', 'stok_bahan', 'stok_note', 'exp-name', 'exp-price', 'cart-customer-name'];
     fields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
     
     renderExpenses();
-    updateAll(); 
+    updateAll(); // updateAll() memanggil saveState(), sehingga otomatis menimpa cache dengan data kosong
     renderRiwayat();
     showToast("Data shift telah di-reset.");
 }
 
+// ==========================================
+// 8. INITIALIZATION
+// ==========================================
+function updateAll() {
+    renderMenu();
+    updateFloatBtn();
+    updateCartModal();
+    calcTotal();
+    saveState(); // Simpan otomatis setiap ada perubahan UI
+}
+
+// Live Clock
+setInterval(() => {
+    const el = document.getElementById('live-clock');
+    if (el) el.innerText = fmtTime(now());
+}, 1000);
+
+// Init on load
+document.addEventListener('DOMContentLoaded', () => {
+    loadState(); // LOAD DATA SEBELUMNYA JIKA ADA
+
+    // Deteksi otomatis ketikan pada input Modal dan Stok agar tersimpan langsung
+    const inputIds = ['p_rupiah', 'stok_cup', 'stok_bahan', 'stok_note'];
+    inputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('input', () => saveState());
+    });
+
+    renderMenu();
+    renderRiwayat();
+    renderExpenses();
+    updateAll();
+    
+    // Auto-load saved profile (Nama & Outlet)
+    const savedNama = localStorage.getItem('rimba_nama');
+    const savedOutlet = localStorage.getItem('rimba_outlet');
+    if(savedNama) document.getElementById('p_nama').value = savedNama;
+    if(savedOutlet) document.getElementById('p_outlet').value = savedOutlet;
+    updateProfile();
+});
+
+// ==========================================
+// 9. FUNGSI RESET DARURAT
+// ==========================================
 function confirmResetDarurat() {
-    hapticFeedback(); 
-    const peringatan = "🚨 PERINGATAN DARURAT! 🚨\n\nApakah Anda yakin ingin MENGHAPUS SEMUA DATA shift ini?\nSemua keranjang, riwayat, dan pengeluaran
+    hapticFeedback(); // Memberikan efek getar jika didukung
+    
+    const peringatan = "🚨 PERINGATAN DARURAT! 🚨\n\nApakah Anda yakin ingin MENGHAPUS SEMUA DATA shift ini?\nSemua keranjang, riwayat, dan pengeluaran yang BELUM DIKIRIM akan hilang selamanya.";
+    
+    if (confirm(peringatan)) {
+        // Panggil fungsi reset bawaan yang sudah kamu buat sebelumnya
+        resetSemuaData();
+        
+        // Kembalikan tampilan ke tab awal (Check-in) agar kasir sadar data sudah bersih
+        const btnAbsen = document.querySelector('.nav-item[onclick*="tab-absen"]');
+        if (btnAbsen) openTab('tab-absen', btnAbsen);
+        
+        showToast("🚨 Semua data berhasil dikosongkan!");
+    }
+}
