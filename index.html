@@ -109,6 +109,17 @@
             <!-- END TOMBOL RESET DARURAT -->
 
         </div>
+        <div class="manual-input-card">
+  <h4>➕ Tambah Menu Custom</h4>
+  <input type="text" id="manual_name" placeholder="Nama Item (Misal: Tambahan Saus)" />
+  <input type="text" id="manual_price" placeholder="Harga (Misal: 5000)" onkeyup="fmt(this)" />
+  <button onclick="addManualMenu()">Tambahkan ke Keranjang</button>
+</div>
+
+<div class="input-group">
+  <label>💳 Total Setoran QRIS (Manual):</label>
+  <input type="text" id="p_qris" placeholder="Rp 0" onkeyup="fmt(this); calcTot();" onchange="saveData()" />
+</div>
     </div>
 
 
@@ -195,5 +206,51 @@
 </div>
 
 <script src="script.js"></script>
+    <button id="calc-trigger-btn" class="calc-trigger-btn">
+    📊 Kalkulator
+</button>
+
+<div id="floating-calc" class="floating-calculator hidden">
+    <div id="calc-header" class="calc-header">
+        <span class="calc-title">🧮 Kalkulator</span>
+        <div class="calc-controls">
+            <button id="calc-min-btn" title="Minimize">−</button>
+            <button id="calc-close-btn" title="Close">×</button>
+        </div>
+    </div>
+    
+    <div class="calc-body">
+        <div class="calc-screen">
+            <div id="calc-history" class="calc-history"></div>
+            <div id="calc-output" class="calc-output">0</div>
+        </div>
+        
+        <div class="calc-buttons">
+            <button class="btn btn-action" data-action="clear">C</button>
+            <button class="btn btn-action" data-action="backspace">⌫</button>
+            <button class="btn btn-action" data-action="percent">%</button>
+            <button class="btn btn-operator" data-action="divide">÷</button>
+            
+            <button class="btn" data-num="7">7</button>
+            <button class="btn" data-num="8">8</button>
+            <button class="btn" data-num="9">9</button>
+            <button class="btn btn-operator" data-action="multiply">×</button>
+            
+            <button class="btn" data-num="4">4</button>
+            <button class="btn" data-num="5">5</button>
+            <button class="btn" data-num="6">6</button>
+            <button class="btn btn-operator" data-action="subtract">−</button>
+            
+            <button class="btn" data-num="1">1</button>
+            <button class="btn" data-num="2">2</button>
+            <button class="btn" data-num="3">3</button>
+            <button class="btn btn-operator" data-action="add">+</button>
+            
+            <button class="btn btn-zero" data-num="0">0</button>
+            <button class="btn" data-num=".">.</button>
+            <button class="btn btn-equals" data-action="calculate">=</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
