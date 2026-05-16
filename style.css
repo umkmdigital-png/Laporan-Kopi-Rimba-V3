@@ -1,265 +1,267 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mini POS Kopi Rimba</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+/* --- RESET & BASE --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
 
-<div class="header">
-    <div class="brand-sub">KOPI RIMBA MAZBOY GROUP</div>
-    <h1 class="brand-main">Sistem Laporan Harian</h1>
-</div>
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f8f9fa;
+    color: #212529;
+    line-height: 1.5;
+    padding-bottom: 100px;
+}
 
-<div class="container">
-    <div id="tab-absen" class="tab-content active">
-        <div class="profile-card">
-            <div class="profile-header">
-                <div class="avatar">☕</div>
-                <div>
-                    <p class="welcome-text">Selamat Bekerja,</p>
-                    <h2 id="display-name">Nama Staff</h2>
-                    <p id="display-role">Shift belum dipilih</p>
-                </div>
-            </div>
-            <div class="profile-meta">
-                <span>🕒 <strong id="live-clock">--:--:--</strong></span>
-                <span>📍 <strong>Kopi Rimba Mazboy</strong></span>
-            </div>
-        </div>
-        <div class="card card-input-area">
-            <div class="input-group">
-                <label>Nama Lengkap</label>
-                <input id="p_nama" type="text" placeholder="Input nama..." oninput="updateProfile()">
-            </div>
-            <div class="input-group">
-                <label>Shift / Outlet</label>
-                <select id="p_outlet" onchange="updateProfile()">
-                    <option value="">-- Pilih Shift --</option>
-                    <option>Kasir - Pagi</option>
-                    <option>Kasir - Malam</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label>Modal Awal (Cash)</label>
-                <input id="p_rupiah" type="text" placeholder="Rp 0" onkeyup="fmtRp(this); if(typeof calcTotal === 'function') calcTotal();">
-            </div>
-            <button class="btn-primary" onclick="doCheckin()">KONFIRMASI MULAI KERJA</button>
-        </div>
-    </div>
+/* --- HEADER --- */
+.header {
+    background: #1a1a1a;
+    color: #fff;
+    text-align: center;
+    padding: 20px 15px;
+    border-bottom: 4px solid #d32f2f;
+}
+.brand-sub { font-size: 10px; letter-spacing: 3px; font-weight: 700; opacity: 0.8; }
+.brand-main { margin-top: 5px; font-size: 22px; color: #d32f2f; }
 
-    <div id="tab-penjualan" class="tab-content">
-        <div class="card">
-            <div class="card-title">📋 Pilih Menu</div>
-            <div class="menu-grid" id="menu-grid"></div>
-        </div>
-        
-        <div class="card">
-            <div class="card-title">💸 Pengeluaran (Opsional)</div>
-            <div class="expense-input-row">
-                <input id="exp-name" type="text" placeholder="Barang (Contoh: Gas)">
-                <input id="exp-price" type="text" placeholder="Rp 0" onkeyup="fmtRp(this)">
-                <button class="btn-add-exp" onclick="addExpense()">+</button>
-            </div>
-            <div id="expense-list"></div>
-            <div class="input-group" style="margin-top:10px">
-                <label>Total Pengeluaran</label>
-                <input id="p_keluar" readonly class="total-bold-gray" value="Rp 0">
-            </div>
-        </div>
+/* --- BOTTOM NAVIGATION --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0 calc(env(safe-area-inset-bottom) + 10px);
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.08);
+    z-index: 1001;
+    border-top: 1px solid #eee;
+}
+.nav-item {
+    border: none;
+    background: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    color: #888;
+    flex: 1;
+    transition: 0.2s;
+    cursor: pointer;
+}
+.nav-item.active { color: #d32f2f; }
+.nav-icon { font-size: 22px; }
+.nav-text { font-size: 11px; font-weight: 700; text-transform: uppercase; }
 
-        <div class="card">
-            <div class="card-title">💰 Perhitungan Keuangan</div>
-            <div class="input-group">
-                <label>Modal Awal (Dari Check-in)</label>
-                <input id="p_modal_readonly" readonly class="total-bold-gray" value="Rp 0">
-            </div>
-            
-            <div class="total-summary-grid" style="grid-template-columns: 1fr 1fr;">
-                <div>
-                    <label>Total Omzet</label>
-                    <div class="val" id="total-omzet-val">Rp 0</div>
-                </div>
-                <div>
-                    <label>Omzet Tunai</label>
-                    <div class="val" id="total-tunai-omzet-val" style="color: #2e7d32;">Rp 0</div>
-                </div>
-                <div>
-                    <label>Omzet QRIS</label>
-                    <div class="val" id="total-qris-val" style="color: #1976d2;">Rp 0</div>
-                </div>
-                <div>
-                    <label>Omzet Online</label>
-                    <div class="val" id="total-online-val" style="color: #f57c00;">Rp 0</div>
-                </div>
-            </div>
-            
-            <div class="input-group" style="margin-top: 15px;">
-                <label style="font-size: 13px; color: #d32f2f;">Setoran Tunai Bersih (Modal + Tunai - Keluar - QRIS/Onl)</label>
-                <input id="total-setoran-val" readonly class="total-bold-gray" value="Rp 0" style="border-color:#d32f2f; color:#d32f2f; font-size:18px;">
-            </div>
-            <button class="btn-dark" onclick="checkout()">⚡ KIRIM LAPORAN KE WHATSAPP</button>
-            
-            <button onclick="confirmResetDarurat()" style="margin-top: 12px; width: 100%; padding: 12px; background: #fff; color: #d32f2f; border: 2px dashed #d32f2f; border-radius: 12px; font-weight: 800; font-size: 14px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: 0.2s;">
-                🚨 RESET DATA DARURAT
-            </button>
-        </div>
+/* --- LAYOUT CONTAINER --- */
+.container {
+    padding: 20px 15px;
+    max-width: 500px;
+    margin: auto;
+}
+.tab-content { display: none; animation: fadeIn 0.3s; }
+.tab-content.active { display: block; }
 
-        <div class="manual-input-card card">
-            <h4>➕ Tambah Menu Custom</h4>
-            <div class="input-group">
-                <input type="text" id="manual_name" placeholder="Nama Item (Misal: Tambahan Saus)" />
-            </div>
-            <div class="input-group">
-                <input type="text" id="manual_price" placeholder="Harga (Misal: 5000)" onkeyup="fmtRp(this)" />
-            </div>
-            <button class="btn-primary" onclick="addManualMenu()">Tambahkan ke Keranjang</button>
-        </div>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
-        <div class="card">
-            <h4 style="font-size: 14px; margin-bottom: 10px; color: #4a5568;">💳 Uang Non-Tunai (Manual)</h4>
-            <div class="input-group">
-                <label>Setoran QRIS (Memotong Netto Tunai):</label>
-                <input type="text" id="p_qris" placeholder="Rp 0" onkeyup="fmtRp(this); calcTotal();" onchange="saveState()" />
-            </div>
-            <div class="input-group">
-                <label>Setoran Online (Gojek/Grab):</label>
-                <input type="text" id="p_online" placeholder="Rp 0" onkeyup="fmtRp(this); calcTotal();" onchange="saveState()" />
-            </div>
-        </div>
-    </div>
+/* --- CARDS & UI COMPONENTS --- */
+.card {
+    background: #fff;
+    padding: 18px;
+    border-radius: 15px;
+    border: 1px solid #edf2f7;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+.card-title {
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #d32f2f;
+    font-weight: 800;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 
-    <div id="tab-stok" class="tab-content">
-        <div class="card">
-            <div class="card-title">📦 Stok Opname (Sisa Akhir)</div>
-            <div class="input-group">
-                <label>Sisa Cup</label>
-                <input id="stok_cup" type="number" placeholder="Total Cup Keseluruhan">
-            </div>
-            <div class="input-group">
-                <label>Sisa Bubuk/Bahan (stok)</label>
-                <input id="stok_bahan" type="text" placeholder="SKM,UHT,Milo">
-            </div>
-            <div class="input-group">
-                <label>Catatan Lainnya</label>
-                <textarea id="stok_note" rows="3" placeholder="Contoh: Sabun cuci piring habis..."></textarea>
-            </div>
-            <p style="font-size: 11px; color: #888;">*Data ini akan otomatis ikut terkirim dalam laporan.</p>
-        </div>
-    </div>
+/* --- PROFILE CARD --- */
+.profile-card {
+    background: linear-gradient(135deg, #1a1a1a, #333);
+    border-radius: 16px;
+    padding: 16px;
+    color: #fff;
+    margin-bottom: 20px;
+    border-left: 5px solid #d32f2f;
+}
+.profile-header { display: flex; align-items: center; gap: 15px; }
+.avatar { 
+    width: 50px; height: 50px; background: #fff; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.profile-meta {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 12px;
+}
 
-    <div id="tab-riwayat" class="tab-content">
-        <div class="card">
-            <div class="card-title">🧾 Riwayat Transaksi</div>
-            <div id="riwayat-list"></div>
-        </div>
-        <button class="btn-dark" onclick="exportRiwayat()">📋 SALIN REKAP KE CLIPBOARD</button>
-    </div>
-</div>
+/* --- FORMS & INPUTS --- */
+.input-group { margin-bottom: 15px; }
+.input-group label {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: block;
+    color: #4a5568;
+}
+input, select, textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 15px;
+    outline: none;
+    transition: 0.2s;
+    -webkit-appearance: none;
+}
+input:focus { border-color: #d32f2f; background: #fff; }
 
-<div class="bottom-nav">
-    <button class="nav-item active" onclick="openTab('tab-absen',this)">
-        <span class="nav-icon">📍</span><span class="nav-text">Check-in</span>
-    </button>
-    <button class="nav-item" onclick="openTab('tab-penjualan',this)">
-        <span class="nav-icon">☕</span><span class="nav-text">Kasir</span>
-    </button>
-    <button class="nav-item" onclick="openTab('tab-stok',this)">
-        <span class="nav-icon">📦</span><span class="nav-text">Stok</span>
-    </button>
-    <button class="nav-item" onclick="openTab('tab-riwayat',this)">
-        <span class="nav-icon">📊</span><span class="nav-text">Riwayat</span>
-    </button>
-</div>
+.expense-input-row {
+    display: grid;
+    grid-template-columns: 1fr 0.8fr 50px;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.btn-add-exp {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 24px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    height: 46px;
+}
 
-<button id="float-cart-btn" onclick="openCartModal()">
-    <span id="float-cart-badge">0</span>
-    <span id="float-cart-total">Rp 0</span>
-</button>
+/* --- SUMMARY GRID --- */
+.total-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+.total-summary-grid div {
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+.total-summary-grid label { font-size: 11px; color: #718096; margin-bottom: 4px; font-weight: 600; }
+.total-summary-grid .val { font-weight: 800; font-size: 15px; color: #2d3748; }
+.total-bold-gray { background: #f1f5f9 !important; font-weight: 700; text-align: center; color: #475569; }
 
-<div id="cart-modal-overlay" onclick="closeCartModal(event)">
-    <div id="cart-modal">
-        <div class="modal-handle"></div>
-        <div class="modal-header">
-            <div style="flex: 1; margin-right: 15px;">
-                <div class="modal-title">Keranjang Pesanan</div>
-                <input type="text" id="cart-customer-name" placeholder="Nama Customer (Opsional)" autocomplete="off">
-            </div>
-            <button class="btn-close-modal" onclick="closeCartModal()">✕</button>
-        </div>
-        <div class="modal-body" id="modal-cart-items"></div>
-        
-        <div class="input-group" style="margin-top:15px; margin-bottom:5px;">
-            <label>Metode Pembayaran</label>
-            <select id="cart-payment">
-                <option value="Tunai">💵 Tunai</option>
-                <option value="QRIS">📱 QRIS / Transfer</option>
-                <option value="Online">🛵 Online (Gojek/Grab/dll)</option>
-            </select>
-        </div>
+/* --- BUTTONS --- */
+.btn-primary {
+    background: #d32f2f; color: #fff; width: 100%; padding: 15px;
+    border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.btn-dark {
+    background: #1a1a1a; color: #fff; width: 100%; padding: 15px;
+    border-radius: 12px; font-weight: 700; font-size: 15px; border: none; cursor: pointer;
+}
 
-        <div class="modal-footer">
-            <div class="modal-total-row">
-                <span>Subtotal</span>
-                <span id="modal-subtotal">Rp 0</span>
-            </div>
-            <div class="modal-footer-btns">
-                <button class="btn-reset" onclick="resetCartOnly()">Reset</button>
-                <button class="btn-confirm" onclick="confirmOrder()">Selesai</button>
-            </div>
-        </div>
-    </div>
-</div>
+/* --- FLOATING CART --- */
+#float-cart-btn {
+    position: fixed;
+    bottom: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #d32f2f;
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    padding: 12px 25px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 20px rgba(211,47,47,0.4);
+    z-index: 999;
+    cursor: pointer;
+}
+#float-cart-badge {
+    background: #fff; color: #d32f2f;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+}
 
-<button id="calc-trigger-btn" class="calc-trigger-btn">
-    📊 Kalkulator
-</button>
+/* --- MENU GRID --- */
+.menu-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+.menu-item {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.menu-controls { display: flex; align-items: center; gap: 12px; }
+.btn-mini {
+    width: 35px; height: 35px; background: #f1f5f9; border-radius: 8px;
+    border: none; font-size: 18px; font-weight: bold; cursor: pointer;
+}
 
-<div id="floating-calc" class="floating-calculator hidden">
-    <div id="calc-header" class="calc-header">
-        <span class="calc-title">🧮 Kalkulator</span>
-        <div class="calc-controls">
-            <button id="calc-min-btn" title="Minimize">−</button>
-            <button id="calc-close-btn" title="Close">×</button>
-        </div>
-    </div>
-    
-    <div class="calc-body">
-        <div class="calc-screen">
-            <div id="calc-history" class="calc-history"></div>
-            <div id="calc-output" class="calc-output">0</div>
-        </div>
-        
-        <div class="calc-buttons">
-            <button class="btn btn-action" data-action="clear">C</button>
-            <button class="btn btn-action" data-action="backspace">⌫</button>
-            <button class="btn btn-action" data-action="percent">%</button>
-            <button class="btn btn-operator" data-action="divide">÷</button>
-            
-            <button class="btn" data-num="7">7</button>
-            <button class="btn" data-num="8">8</button>
-            <button class="btn" data-num="9">9</button>
-            <button class="btn btn-operator" data-action="multiply">×</button>
-            
-            <button class="btn" data-num="4">4</button>
-            <button class="btn" data-num="5">5</button>
-            <button class="btn" data-num="6">6</button>
-            <button class="btn btn-operator" data-action="subtract">−</button>
-            
-            <button class="btn" data-num="1">1</button>
-            <button class="btn" data-num="2">2</button>
-            <button class="btn" data-num="3">3</button>
-            <button class="btn btn-operator" data-action="add">+</button>
-            
-            <button class="btn btn-zero" data-num="0">0</button>
-            <button class="btn" data-num=".">.</button>
-            <button class="btn btn-equals" data-action="calculate">=</button>
-        </div>
-    </div>
-</div>
+/* --- MODAL (OVERLAY & CONTENT) --- */
+#cart-modal-overlay {
+    display: none;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); z-index: 2000;
+}
+#cart-modal {
+    position: absolute; bottom: 0; left: 0; width: 100%; max-width: 500px;
+    background: #fff; padding: 20px; border-radius: 25px 25px 0 0;
+    left: 50%; transform: translateX(-50%);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;}
+.modal-title { font-weight: bold; font-size: 16px; color: #d32f2f; }
+.modal-footer { margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;}
+.modal-total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; margin-bottom:15px;}
+.modal-footer-btns { display: flex; gap: 10px; }
+.btn-reset { flex: 1; padding: 12px; background: #f1f5f9; border: none; border-radius: 12px; font-weight:bold; cursor: pointer; color: #475569;}
+.btn-confirm { flex: 2; padding: 12px; background: #d32f2f; color: #fff; border: none; border-radius: 12px; font-weight:bold; cursor: pointer;}
+.btn-close-modal { background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer; color: #888;}
 
-<script src="script.js"></script>
-</body>
-</html>
+/* CUSTOMER INPUT MODAL */
+#cart-customer-name {
+    margin-top: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    outline: none;
+    background: #f8fafc;
+}
+#cart-customer-name:focus {
+    border-color: #d32f2f;
+    background: #fff;
+}
