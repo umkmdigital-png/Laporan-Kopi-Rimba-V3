@@ -542,65 +542,32 @@ function addManualMenu() {
     const nameInput = document.getElementById('manual_name');
     const priceInput = document.getElementById('manual_price');
 
+    if (!nameInput || !priceInput) return;
+
     const n = nameInput.value.trim();
+    // Mengambil angka saja dari input harga
     const h = parseInt(priceInput.value.replace(/[^0-9]/g, '')) || 0;
 
     if (!n || h <= 0) {
         return alert('Masukkan nama item dan harga yang valid!');
     }
 
-    // Buat ID unik untuk menu custom agar tidak bertabrakan
-    const id = 'manual_' + Date.now();
-
-    // Masukkan ke state Menu Utama (cP)
-    if (!cP[id]) {
-        cP[id] = { qty: 0, h: h, n: n, isManual: true };
+    // Gunakan nama item sebagai key di dalam state 'cart' Kopi Rimba
+    if (!cart[n]) {
+        cart[n] = { qty: 0, harga: h, isManual: true };
     }
-    cP[id].qty++;
+    cart[n].qty++;
 
     // Bersihkan form setelah input
     nameInput.value = '';
     priceInput.value = '';
 
-    if(navigator.vibrate) navigator.vibrate(15);
-    toast('✓ Item manual ditambahkan');
+    if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(15);
+    showToast('✓ Item manual ditambahkan');
     
-    // Perbarui keranjang dan kalkulasi
-    upd(); 
+    // Perbarui keranjang dan kalkulasi sesuai fungsi Kopi Rimba
+    updateAll(); 
 }
-
-// 2. Cari fungsi calcTot() di script asli Anda, lalu GANTI seluruh isinya dengan ini:
-function calcTot() {
-    const omzetTunai = orders.filter(o=>o.pay==='Tunai').reduce((a,o)=>a+o.sub, 0);
-    const omzetQRIS = orders.filter(o=>o.pay==='QRIS').reduce((a,o)=>a+o.sub, 0);
-    const omzetOnline = orders.filter(o=>o.pay==='Gojek/Online').reduce((a,o)=>a+o.sub, 0);
-
-    const { sP, sT, sSc } = tots();
-    const keranjang = sP + sT + sSc;
-
-    const modal = nn(g('p_modal').value);
-    const pengeluaran = exps.reduce((a,b) => a+b.p, 0);
-
-    /* BARIS DI BAWAH INI TELAH DIHAPUS AGAR QRIS TIDAK TERISI OTOMATIS:
-       g('p_qris').value = rp(totalQRIS);
-    */
-    
-    // Ambil nilai QRIS langsung dari apa yang diketik staf (Manual)
-    const manualQris = nn(g('p_qris').value);
-    // (Opsional) Jika Online juga mau manual, biarkan kode ini mengambil dari input
-    const manualOnline = nn(g('p_online').value);
-
-    // Hitung ulang Netto Tunai Kasir
-    // Netto = Modal + Total Semua Omzet Fisik - Pengeluaran Kasir - Uang di QRIS - Uang di Online
-    const totalSemuaPenjualan = omzetTunai + omzetQRIS + omzetOnline + keranjang;
-    const nettoTunai = modal + totalSemuaPenjualan - pengeluaran - manualQris - manualOnline;
-
-    const totalPorsi = orders.reduce((a,o)=>a+o.porsi, 0) + Object.values(cP).reduce((a,b)=>a+b.qty, 0);
-
-    g('t_porsi').innerText = totalPorsi + ' Porsi';
-    g('t_tunai').innerText = rp(nettoTunai < 0 ? 0 : nettoTunai);
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     const calc = document.getElementById("floating-calc");
     const header = document.getElementById("calc-header");
@@ -618,6 +585,61 @@ document.addEventListener("DOMContentLoaded", () => {
     let shouldResetScreen = false;
 
     // --- 1. Fitur Buka / Tutup / Minimize ---
+function calcTotal() {
+    let currentBruto = 0, currentCups = 0;
+    for (const k in cart) {
+        currentBruto += cart[k].qty * cart[k].harga;
+        currentCups += cart[k].qty;
+    }
+
+    let omzetTunai = 0, omzetQRIS = 0, omzetOnline = 0, totalCupSesi = 0;
+
+    sessionOrders.forEach(o => {
+        totalCupSesi += o.totalCup;
+        if (o.payment === 'Tunai') omzetTunai += o.subtotal;
+        else if (o.payment === 'QRIS') omzetQRIS += o.subtotal;
+        else if (o.payment === 'Online') omzetOnline += o.subtotal;
+    });
+
+    // Total omzet dari transaksi yang sudah selesai ditambah item yang masih ada di keranjang berjalan
+    const totalJualSesi = omzetTunai + omzetQRIS + omzetOnline + currentBruto;
+    const totalKeluar = expenses.reduce((a, b) => a + b.price, 0);
+    const modalAwal = cleanNum(document.getElementById('p_rupiah')?.value);
+
+    // --- LOGIKA BARU: AMBIL NILAI QRIS & ONLINE DARI INPUT MANUAL DI INPUT SHIFT ---
+    // Pastikan elemen 'p_qris' dan 'p_online' ada di HTML rekap shift kamu
+    const manualQris = cleanNum(document.getElementById('p_qris')?.value);
+    const manualOnline = cleanNum(document.getElementById('p_online')?.value);
+
+    // Hitung ulang Netto Setoran Tunai (Memotong saldo QRIS & Online yang diinput manual)
+    const setoranTunai = modalAwal + totalJualSesi - totalKeluar - manualQris - manualOnline;
+
+    const totalPorsi = totalCupSesi + currentCups;
+
+    const updateUI = (id, text, isInput = false) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (isInput || el.tagName === 'INPUT') el.value = text;
+        else el.innerText = text;
+    };
+
+    // Update elemen text porsi jika ada
+    const porsiEl = document.getElementById('t_porsi');
+    if (porsiEl) porsiEl.innerText = totalPorsi + ' Porsi';
+
+    updateUI('p_modal_readonly', "Rp " + modalAwal.toLocaleString('id-ID'), true);
+    updateUI('p_keluar', "Rp " + totalKeluar.toLocaleString('id-ID'), true);
+    
+    updateUI('total-omzet-val', "Rp " + totalJualSesi.toLocaleString('id-ID'));
+    updateUI('total-tunai-omzet-val', "Rp " + omzetTunai.toLocaleString('id-ID'));
+    updateUI('total-qris-val', "Rp " + omzetQRIS.toLocaleString('id-ID'));
+    updateUI('total-online-val', "Rp " + omzetOnline.toLocaleString('id-ID'));
+    
+    updateUI('total-setoran-val', "Rp " + (setoranTunai < 0 ? 0 : setoranTunai).toLocaleString('id-ID'), true);
+    // Jalankan juga di teks biasa jika bukan elemen input
+    const tunaiTextEl = document.getElementById('t_tunai');
+    if (tunaiTextEl) tunaiTextEl.innerText = "Rp " + (setoranTunai < 0 ? 0 : setoranTunai).toLocaleString('id-ID');
+}
     triggerBtn.addEventListener("click", () => {
         calc.classList.remove("hidden");
     });
@@ -770,5 +792,17 @@ document.addEventListener("DOMContentLoaded", () => {
         isDragging = false;
         document.removeEventListener("mousemove", dragMove);
         document.removeEventListener("touchmove", dragMove);
+    }
+});
+
+// Di dalam dokumentasi init DOMContentLoaded, perbarui bagian inputIds:
+const inputIds = ['p_rupiah', 'stok_cup', 'stok_bahan', 'stok_note', 'p_qris', 'p_online'];
+inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) {
+        el.addEventListener('input', () => {
+            calcTotal(); // Jalankan kalkulasi ulang saat diketik
+            saveState(); // Simpan otomatis ke localStorage
+        });
     }
 });
